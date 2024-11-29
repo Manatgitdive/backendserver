@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .upload-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .file-input {
+            margin: 20px 0;
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .upload-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .upload-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            word-break: break-all;
+        }
+        .url-container {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <h2>File Upload Test</h2>
+        <form id="uploadForm">
+            <input type="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+            <button type="submit" class="upload-btn" id="uploadButton">Upload File</button>
+        </form>
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('fileInput');
+        const uploadButton = document.getElementById('uploadButton');
+        const result = document.getElementById('result');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const file = fileInput.files[0];
+            if (!file) {
+                showStatus('Please select a file first.', 'error');
+                return;
+            }
+
+            uploadButton.disabled = true;
+            uploadButton.textContent = 'Uploading...';
+            
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('http://localhost:8080/upload-pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    const resultHtml = `
+                        <div class="status success">File uploaded successfully!</div>
+                        <div class="url-container">
+                            <strong>CloudFront URL:</strong><br>
+                            <a href="${data.cloudFrontUrl}" target="_blank">${data.cloudFrontUrl}</a>
+                        </div>
+                        <div class="url-container">
+                            <strong>S3 URL:</strong><br>
+                            <a href="${data.s3Url}" target="_blank">${data.s3Url}</a>
+                        </div>
+                    `;
+                    result.innerHTML = resultHtml;
+                } else {
+                    showStatus('Upload failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error uploading file: ' + error.message, 'error');
+            } finally {
+                uploadButton.disabled = false;
+                uploadButton.textContent = 'Upload File';
+            }
+        });
+
+        function showStatus(message, type) {
+            result.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        // Clear result when new file is selected
+        fileInput.addEventListener('change', () => {
+            result.innerHTML = '';
+        });
+    </script>
+</body>
+</html>

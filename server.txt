@@ -1,0 +1,96 @@
+const AWS = require('aws-sdk');
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const app = express();
+const port = 8080;
+
+// AWS Configuration
+AWS.config.update({
+    accessKeyId: 'AKIA3RI4MBHW4RJGBYMN',
+    secretAccessKey: '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',
+    region: 'ap-south-1'
+});
+
+const s3 = new AWS.S3();
+const upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
+        const allowedMimes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'image/jpeg',
+            'image/png'
+        ];
+        
+        if (allowedMimes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF, DOC, DOCX, JPG, and PNG files are allowed.'), false);
+        }
+    },
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+});
+
+// CORS middleware
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
+
+app.post('/upload-pdf', upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'No file uploaded' 
+            });
+        }
+
+        // Generate unique filename
+        const fileExtension = path.extname(req.file.originalname);
+        const filename = `${Date.now()}-${Math.round(Math.random() * 1000)}${fileExtension}`;
+
+        // S3 upload parameters - removed ACL
+        const params = {
+            Bucket: 'images-b1-friendcity',
+            Key: `uploads/${filename}`,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype
+        };
+
+        // Upload to S3
+        const uploadResult = await s3.upload(params).promise();
+
+        // Generate CloudFront URL
+        const cloudFrontUrl = `https://d1abza710rbese.cloudfront.net/uploads/${filename}`;
+
+        res.status(200).json({
+            success: true,
+            message: 'File uploaded successfully',
+            s3Url: uploadResult.Location,
+            cloudFrontUrl: cloudFrontUrl,
+            filename: filename
+        });
+
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error uploading file',
+            details: error.message
+        });
+    }
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK' });
+});
+
+app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+});
