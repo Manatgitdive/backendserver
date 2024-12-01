@@ -1,10 +1,14 @@
 # Environment variables
 .env
 .env.local
-.env.*
+.env.* # Keep for flexibility in managing environment files
+
+# Logs (Express apps often generate logs)
+*.log
+logs/
 
 # Dependencies
-node_modules/
+node_modules/ # No changes, as it's already correct for Node.js projects
 
 # OS files
-.DS_Store
+.DS_Store # No changes, as it's relevant for macOS users
