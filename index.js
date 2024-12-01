@@ -7,9 +7,9 @@ const port = 8080;
 
 // AWS Configuration
 AWS.config.update({
-    accessKeyId: 'AKIA3RI4MBHW4RJGBYMN',
-    secretAccessKey: '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',
-    region: 'ap-south-1'
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION
 });
 
 const s3 = new AWS.S3();
