@@ -1,20 +1,15 @@
-require('dotenv').config();
 const AWS = require('aws-sdk');
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const app = express();
+const port = 8080;
 
-// Environment variables
-const port = process.env.PORT || 8080;
-const bucketName = process.env.AWS_BUCKET_NAME || 'images-b1-friendcity';
-const cloudFrontUrl = process.env.CLOUDFRONT_URL || 'https://d1abza710rbese.cloudfront.net';
-
-// AWS Configuration using environment variables
+// AWS Configuration
 AWS.config.update({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_REGION
+    accessKeyId: 'AKIA3RI4MBHW4RJGBYMN',
+    secretAccessKey: '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',
+    region: 'ap-south-1'
 });
 
 const s3 = new AWS.S3();
@@ -23,20 +18,21 @@ const s3 = new AWS.S3();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// CORS middleware
+// CORS middleware with additional headers for large file uploads
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.header('Access-Control-Expose-Headers', 'Content-Length');
     
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
     next();
 });
 
-// Password protection page
+// Password protection page remains the same
 app.get('/view/:filename', (req, res) => {
     const filename = req.params.filename;
     const password = req.query.password;
@@ -100,7 +96,7 @@ app.get('/view/:filename', (req, res) => {
                     if (enteredPassword === expectedPassword) {
                         successMessage.classList.remove('hidden');
                         setTimeout(() => {
-                            window.location.href = '${cloudFrontUrl}/uploads/' + filename;
+                            window.location.href = 'https://d1abza710rbese.cloudfront.net/uploads/' + filename;
                         }, 1500);
                     } else {
                         errorMessage.classList.remove('hidden');
@@ -115,18 +111,21 @@ app.get('/view/:filename', (req, res) => {
     res.send(html);
 });
 
-// File upload configuration
+// Updated file upload configuration
 const upload = multer({
     storage: multer.memoryStorage(),
     fileFilter: (req, file, cb) => {
         const allowedMimes = [
+            // Document types
             'application/pdf',
             'application/msword',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            // Video types
             'video/mp4',
-            'video/quicktime',
-            'video/x-msvideo',
+            'video/quicktime', // For .mov files
+            'video/x-msvideo', // For .avi files
             'video/webm',
+            // Image types
             'image/jpeg',
             'image/png'
         ];
@@ -142,7 +141,7 @@ const upload = multer({
     }
 });
 
-// Upload endpoint
+// Updated upload endpoint
 app.post('/upload-file', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -154,10 +153,12 @@ app.post('/upload-file', upload.single('file'), async (req, res) => {
 
         const fileExtension = path.extname(req.file.originalname);
         const filename = `${Date.now()}-${Math.round(Math.random() * 1000)}${fileExtension}`;
+
+        // Add Content-Disposition header for better download experience
         const contentDisposition = `attachment; filename="${encodeURIComponent(req.file.originalname)}"`;
 
         const params = {
-            Bucket: bucketName,
+            Bucket: 'images-b1-friendcity',
             Key: `uploads/${filename}`,
             Body: req.file.buffer,
             ContentType: req.file.mimetype,
@@ -166,7 +167,7 @@ app.post('/upload-file', upload.single('file'), async (req, res) => {
         };
 
         // For large files, use multipart upload
-        if (req.file.size > 5 * 1024 * 1024) {
+        if (req.file.size > 5 * 1024 * 1024) { // If file is larger than 5MB
             const multipartParams = {
                 ...params,
                 ACL: 'public-read',
@@ -181,20 +182,21 @@ app.post('/upload-file', upload.single('file'), async (req, res) => {
                 success: true,
                 message: 'File uploaded successfully',
                 s3Url: uploadResult.Location,
-                cloudFrontUrl: `${cloudFrontUrl}/uploads/${filename}`,
+                cloudFrontUrl: `https://d1abza710rbese.cloudfront.net/uploads/${filename}`,
                 protectedUrl: `${req.protocol}://${req.get('host')}/view/${filename}`,
                 filename: filename,
                 fileType: req.file.mimetype,
                 originalName: req.file.originalname
             });
         } else {
+            // For smaller files, use regular upload
             const uploadResult = await s3.upload(params).promise();
 
             res.status(200).json({
                 success: true,
                 message: 'File uploaded successfully',
                 s3Url: uploadResult.Location,
-                cloudFrontUrl: `${cloudFrontUrl}/uploads/${filename}`,
+                cloudFrontUrl: `https://d1abza710rbese.cloudfront.net/uploads/${filename}`,
                 protectedUrl: `${req.protocol}://${req.get('host')}/view/${filename}`,
                 filename: filename,
                 fileType: req.file.mimetype,
@@ -229,7 +231,6 @@ app.use((error, req, res, next) => {
     });
 });
 
-// Start server
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
 });
